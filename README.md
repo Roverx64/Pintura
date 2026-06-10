@@ -3,7 +3,7 @@ Pretty basic huion tablet driver for hyprland. Not for inexperienced linux or C 
 This does not redirect pen movement to the tablet screen as that can be done via hyprland `device` configuration.  
 Made for the `huion kamvas pro 13` and likely won't work with other models.  
   
-I really only made this after no driver supported my tablet's touchstrip and later added pad surpport after `input-remapper` started having issues
+I really only made this after no driver supported my tablet's touchstrip and later added pad support after `input-remapper` started having issues
 
 ##### Supports the tablet's touchstrip and pads
 
