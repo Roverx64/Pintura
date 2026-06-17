@@ -21,7 +21,7 @@ Then change the `HUION_STRIP` to `HUION Huion Monitor Touch Strip` or whatever t
 
 #### Run `make`, then run `sudo ./pintura.o`
 
-To run it as sudo on startup, you'll have to research how to do that for your distro.  
+To run it as root on startup, you'll have to research how to do that for your distro.  
 **OR**  
 You can change the device to allow the `wheel group` to open the input files via [**udev**](https://www.man7.org/linux/man-pages/man7/udev.7.html).
 
