@@ -9,9 +9,11 @@
 #include <time.h>
 #include <linux/uinput.h>
 #include <signal.h>
+#include <errno.h>
 #include "pintura.h"
 
-int evtfd = -1;
+static int evtfd = -1;
+static tabletConfig *tablet = NULL;
 
 typedef struct {
     struct timeval time;
@@ -95,19 +97,6 @@ void pad3Keys(){
     }
 }
 
-void initRequiredKeys(int padfd){
-    ioctl(evtfd,UI_SET_EVBIT,EV_KEY);
-    ADD_KEY(KEY_EQUAL);
-    ADD_KEY(KEY_MINUS);
-    if(padfd >= 0){
-        /*############# YOU MUST ADD NEW KEYS HERE #############*/
-        ADD_KEY(KEY_LEFTCTRL);
-        ADD_KEY(KEY_Z);
-        ADD_KEY(KEY_S);
-        //Example: ADD_KEY(KEY_<UINPUT_KEYCODE>);
-    }
-}
-
 /*############# END OF CUSTOM KEYS #############*/
 
 bool touching = false;
@@ -115,12 +104,12 @@ int last = -1;
 
 void stripEvent(evIn *event){
     if(event->type != 3){return;}
-    if(event->value == HUION_STRIP_TOUCHED){touching = true; return;}
-    if(event->value == HUION_STRIP_RELEASED){touching = false; last = -1; return;}
+    if(event->value == tablet->codes.stripPressed){touching = true; return;}
+    if(event->value == tablet->codes.stripReleased){touching = false; last = -1; return;}
     //Determine direction
     int cmd;
     if(last != -1){
-        cmd = (last > event->value) ? KEY_EQUAL: KEY_MINUS;
+        cmd = (last > event->value) ? tablet->stripUp : tablet->stripDown;
     }
     else{
         last = event->value;
@@ -134,55 +123,63 @@ void stripEvent(evIn *event){
 
 void padEvent(evIn *event){
     unsigned short pad = event->code;
-    switch(pad){
-        case PAD_0:
-        pad0Keys();
-        break;
-        case PAD_1:
-        pad1Keys();
-        break;
-        case PAD_2:
-        pad2Keys();
-        break;
-        case PAD_3:
-        pad3Keys();
-        break;
-        default:
-        return;
-        break;
+    int bindNum = 0;
+    bool found = false;
+    for(; bindNum < tablet->padNum; ++bindNum){
+        if(tablet->padIDs[bindNum] == pad){found = true; break;}
+    }
+    if(!found){return;} //Pad is not documented
+    //Press keybinds
+    for(int i = 0; i < tablet->padBinds[bindNum].seqNum; ++i){
+        if(tablet->padBinds[bindNum].keyVal == NULL){printf("NULL kv\n"); return;}
+        if(tablet->padBinds[bindNum].keyVal[0] == 0){printf("Disabled pad\n"); return;}
+        if(tablet->codes.padPressed == event->value){
+            PRESS_KEY(tablet->padBinds[bindNum].keyVal[i]);
+        }
+        else{
+            RELEASE_KEY(tablet->padBinds[bindNum].keyVal[i]);
+        }
     }
     writeKey(EV_SYN,0,0);
 }
 
-int padfd = -1;
-int stripfd = -1;
+static int padfd = -1;
+static int stripfd = -1;
 
 void signalHandler(int sig){
-    if((sig == SIGINT) || (sig == SIGKILL) || (sig == SIGTERM)){
-        printf("-Cleaning up-\n");
-        close(padfd);
-        close(stripfd);
-        if(evtfd >= 0){
-            ioctl(evtfd,UI_DEV_DESTROY);
-            close(evtfd);
-        }
-        printf("Finished\n");
-        exit(EXIT_SUCCESS);
+    printf("-Cleaning up-\n");
+    close(padfd);
+    close(stripfd);
+    if(evtfd >= 0){
+        ioctl(evtfd,UI_DEV_DESTROY);
+        close(evtfd);
     }
+    printf("Finished\n");
+    exit(EXIT_SUCCESS);
 }
 
-void initEvents(int pfd, int sfd){
-    padfd = pfd;
-    stripfd = sfd;
+void enableFakeKey(int key){
+    ADD_KEY(key);
+}
+
+bool initFakeDevice(){ //Creates the fake device at the start to make my life easier
     //Catch signals
     signal(SIGKILL,signalHandler);
     signal(SIGINT,signalHandler);
     signal(SIGTERM,signalHandler);
-    printf("Creating fake device\n");
+    signal(SIGTSTP,signalHandler);
     evtfd = open("/dev/uinput",O_WRONLY|O_NONBLOCK);
-    if(evtfd < 0){printf("Failed to open uinput\n"); return;}
-    initRequiredKeys(padfd);
-    //Create fake device
+    if(evtfd < 0){printf("Failed to open uinput\n"); return false;}
+    ioctl(evtfd,UI_SET_EVBIT,EV_KEY);
+    return true;
+}
+
+void initEvents(int pfd, int sfd, tabletConfig *cnf){
+    tablet = cnf;
+    padfd = pfd;
+    stripfd = sfd;
+    //Finalize the device
+    printf("Creating fake device\n");
     struct uinput_setup dev;
     memset(&dev,0x0,sizeof(dev));
     char *nm = "Pintura";
@@ -200,13 +197,21 @@ void initEvents(int pfd, int sfd){
         //Check for strip events
         usleep(2);
         evIn event;
-        ssize_t sz = read(stripfd,&event,sizeof(event));
+        ssize_t sz = read(sfd,&event,sizeof(event));
+        if((sz == -1) && (errno != EAGAIN)){
+            printf("Error reading stripfd %i\n",errno);
+            signalHandler(SIGINT);
+        }
         if(sz > 0){
             stripEvent(&event);
         }
         sz = 0x0;
         //Check for pad events
         sz = read(padfd,&event,sizeof(event));
+        if((sz == -1) && (errno != EAGAIN)){
+            printf("Error reading padfd %i\n",errno);
+            signalHandler(SIGINT);
+        }
         if(sz > 0){
             padEvent(&event);
         }

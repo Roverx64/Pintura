@@ -15,7 +15,7 @@ char waste[1000];
 bool checkEntry(FILE *proc, char *check){
     char name[200] = {'\0'}; //Hopefully enough for HUION stuff
     //Read in name
-    fscanf(proc,"%*s Name=\"%200[^\"]",&name);
+    fscanf(proc,"%*s Name=\"%200[^\"]",(char*)&name);
     if(!strcmp(check,&name)){return true;}
     return false;
 }

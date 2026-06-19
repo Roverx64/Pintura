@@ -1,7 +1,8 @@
 # Pintura  
 Pretty basic huion tablet driver for hyprland. Not for inexperienced linux or C users.  
 This does not redirect pen movement to the tablet screen as that can be done via hyprland `device` configuration.  
-Made for the `huion kamvas pro 13` and likely won't work with other models.  
+  
+**Made for the `huion kamvas pro 13` and may work with other models with some tinkering.**
   
 I really only made this after no driver supported my tablet's touchstrip and later added pad support after `input-remapper` started having issues
 
@@ -12,24 +13,25 @@ I really only made this after no driver supported my tablet's touchstrip and lat
 - Linux's uinput
 
 ### Usage  
-##### **Change `HUION_PAD` and `HUION_STRIP` input name if necessary. (located in pintura.h)**
+#### **Config names are case sensitive!**  
+##### **Change `StripName` and `PadName` input name if necessary. (located in pintura.conf)**
 The device names can be found using `cat /proc/bus/input/devices`.  
 
 Find the target device, the atrribute normally looks like: `N: Name="HUION Huion Monitor Touch Strip"`  
 
-Then change the `HUION_STRIP` to `HUION Huion Monitor Touch Strip` or whatever text is present.  
+Then change the `StripName` to `HUION Huion Monitor Touch Strip` or whatever text is present.  
 
 #### Run `make`, then run `sudo ./pintura.o`
 
-To run it as root on startup, you'll have to research how to do that for your distro.  
+To run it as sudo on startup, you'll have to research how to do that for your distro.  
 **OR**  
 You can change the device to allow the `wheel group` to open the input files via [**udev**](https://www.man7.org/linux/man-pages/man7/udev.7.html).
 
 ## Changing pad keybinds
-You'll have to edit the C code to add new keypresses for the pads you desire. Comments have been left to help guide this in `events.c`  
-Keys can be found [**here**](https://hackage-content.haskell.org/package/evdev-2.3.1.2/docs/Evdev-Codes.html) and must be in all caps.  
+Edit the `pintura.conf` to add keybind codes in order of the pads. This will be changed later to allow plain text writing for keybinds.  
+Keys can be found [**here**](https://hackage-content.haskell.org/package/evdev-2.3.1.2/docs/Evdev-Codes.html)
 
 ## Todo
 - Add pen button support
-- Add a simple config file to allow easier button changes and device name changes
-- Add a GUI via SDL (maybe)
+- Add error checks in config loader
+- Add a GUI via SDL (unlikely)
